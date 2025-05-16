@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Highlighting test cases</title>
+    <link rel="stylesheet" href="./src/injected.css">
+    <style>
+      * {
+        hyphens: auto;
+      }
+    </style>
+    <script src="./src/injected.js" defer></script>
+  </head>
+  <body>
+    <!-- Test: normal text. -->
+    <p>A big giant sentence that has lots of words</p>
+    <p>
+      Cottage out enabled was entered greatly prevent message. No procured unlocked an likewise.
+      Dear but what she been over gay felt body. Six principles advantages and use entreaties
+      decisively. Eat met has dwelling unpacked see whatever followed. Court in of leave again as
+      am. Greater sixteen to forming colonel no on be. So an advice hardly barton. He be turned
+      sudden engage manner spirit.
+    </p>
+    <p>
+      A sentence with a <em><u>emphasized</u></em> word, a <strong><u>strong</u></strong> word, and an
+      <u>undqgerlined qqqppp</u> word. qqqppp
+    </p>
+    <p id="to-be-populated-paragraph"></p>
+    <p>Another paragraph</p>
+
+    <b>Begin regular expression tests</b>
+    <!-- Test: Whitespace. -->
+    <p>
+      Whitespace: In          the          source          code,          there          is     lots
+      of          whitespace          in          between          these        words.
+    </p>
+    <pre>
+      Whitespace: In          the          source          code,          there        is      lots
+      of          whitespace          in          between          these        words.
+    </pre>
+
+    <!-- Test: underscore. -->
+    <p>Underscore: long_identifier_that_is_super_long_hard_to_read.</p>
+
+    <!-- Test: hyphens. -->
+    <p>Hyphen 1: Some-hyphenated-long-word-1 and Some–hyphenated–long–word–2</p>
+
+    <!-- Test: parentheses. -->
+    <p>Parentheses 1: call_method(with_this_parameter1, (with_param2 + 1));</p>
+
+    <!-- Test: slash. -->
+    <p>Slash: This/is/a/slash/separated/word.</p>
+
+    <!-- Test: parentheses. -->
+    <p>Parentheses 2: ((((wow))))</p>
+
+    <!-- Test: brackets. -->
+    <p>Brackets: int x[2] = new int[2];</p>
+
+     <!-- Test: braces. -->
+    <p>Braces: int x[3] = new int[] {1, 2, 3};</p>
+
+    <!-- Test: comma-->
+    <p>Comma: I have a dog, cat, and mouse.</p>
+
+    <!-- Test: dot-->
+    <p>Dot: I have a dog, cat, and mouse. I have more pets.</p>
+
+    <!-- Test: colon-->
+    <p>Colon: All tests have colon.</p>
+
+    <!-- Test: semicolon-->
+    <p>Semicolon: But not all have semicolon; this one in particular does.</p>
+
+    <!-- Test: question mark-->
+    <p>Question mark: Who am I? I don't know</p>
+
+    <!-- Test: exclamation mark-->
+    <p>Exclamation mark: Please! Help!!!</p>
+
+    <!-- Test: exclamation mark-->
+    <p>Ellipsis: O la la… c'est la vie</p>
+
+    <p>W&nbsp;O&nbsp;R&nbsp;D</p>
+
+    <b>End regular expression tests</b>
+
+     <!-- Test: money. -->
+    <p>I have $10 dollars and 3€ euros.</p>
+    <script>
+      const toBePopulatedParagraph = document.getElementById('to-be-populated-paragraph');
+      function write(s) {
+        return toBePopulatedParagraph.appendChild(document.createTextNode(s));
+      }
+      
+      write('');
+      const start = write('P');
+      write('');
+      write('e');
+      write('');
+      write('r');
+      write('');
+      write('r');
+      const m = write('');
+      const o = write('o');
+      write('');
+      write('');
+      const end = write('');
+    </script>
+  </body>
+</html>

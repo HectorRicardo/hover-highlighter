@@ -1,0 +1,9 @@
+::highlight(hover-highlighter_word) {
+  background-color: #FDE97D;
+  color: black; /* text color */
+}
+
+::highlight(hover-highlighter_line) {
+  background-color: #ADD8E6;
+  color: black; /* text color */
+}
