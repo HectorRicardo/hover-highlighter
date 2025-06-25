@@ -6,6 +6,20 @@ chrome.runtime.onInstalled.addListener(() => {
 chrome.action.onClicked.addListener(async (tab) => {
   if (tab.url.startsWith('chrome://')) return;
 
+  // Workaround to pass in arguments to the script we will inject next.
+  await chrome.scripting.executeScript({
+    target: {tabId: tab.id},
+    func: (args) => {
+      window.hoverHighlighterArgs = args;
+    },
+    args: [{
+      lineBackgroundColor: '#ADD8E660',
+      lineTextColor: 'black',
+      wordBackgroundColor: '#FDE97D60',
+      wordTextColor: 'black',
+    }],
+  });
+
   // This gives the extension new on/off status.
   const [{result: isTurnedOn}] = await chrome.scripting.executeScript({
     target: {tabId: tab.id},

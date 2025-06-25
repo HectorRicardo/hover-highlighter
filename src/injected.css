@@ -1,9 +1,9 @@
 ::highlight(hover-highlighter_word) {
-  background-color: #FDE97D;
-  color: black; /* text color */
+  background-color: var(--hover_highlighter-word_background_color);
+  color: var(--hover_highlighter-word_text_color);
 }
 
 ::highlight(hover-highlighter_line) {
-  background-color: #ADD8E6;
-  color: black; /* text color */
+  background-color: var(--hover_highlighter-line_background_color);
+  color: var(--hover_highlighter-line_text_color);
 }

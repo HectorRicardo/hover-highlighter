@@ -596,6 +596,26 @@
   document.body.addEventListener('pointermove', pointerMoveHandler);
   document.body.addEventListener('pointerleave', pointerLeaveHandler);
 
+  // Set all the colors according to the arguments.
+  const {hoverHighlighterArgs} = window;
+
+  document.documentElement.style.setProperty(
+    '--hover_highlighter-line_background_color',
+    hoverHighlighterArgs.lineBackgroundColor,
+  );
+  document.documentElement.style.setProperty(
+    '--hover_highlighter-line_text_color',
+    hoverHighlighterArgs.lineTextColor,
+  );
+  document.documentElement.style.setProperty(
+    '--hover_highlighter-word_background_color',
+    hoverHighlighterArgs.wordBackgroundColor,
+  );
+  document.documentElement.style.setProperty(
+    '--hover_highlighter-word_text_color',
+    hoverHighlighterArgs.wordTextColor,
+  );
+
   // This value is useful in two ways:
   // 1. The presence/absence of this value is used as a state to know whether
   //    the extension should be turned on/off.
