@@ -264,8 +264,8 @@
       return;
     }
 
-    updateHighlightLineRangeStart();
     updateHighlightLineRangeEnd();
+    updateHighlightLineRangeStart();
 
     // This if-check means: if the caret is pointing to the leading or trailing
     // whitespace of the line, then this doesn't count as valid highlighting.
@@ -600,20 +600,20 @@
   const {hoverHighlighterArgs} = window;
 
   document.documentElement.style.setProperty(
-    '--hover_highlighter-line_background_color',
-    hoverHighlighterArgs.lineBackgroundColor,
+      '--hover_highlighter-line_background_color',
+      hoverHighlighterArgs.lineBackgroundColor,
   );
   document.documentElement.style.setProperty(
-    '--hover_highlighter-line_text_color',
-    hoverHighlighterArgs.lineTextColor,
+      '--hover_highlighter-line_text_color',
+      hoverHighlighterArgs.lineTextColor,
   );
   document.documentElement.style.setProperty(
-    '--hover_highlighter-word_background_color',
-    hoverHighlighterArgs.wordBackgroundColor,
+      '--hover_highlighter-word_background_color',
+      hoverHighlighterArgs.wordBackgroundColor,
   );
   document.documentElement.style.setProperty(
-    '--hover_highlighter-word_text_color',
-    hoverHighlighterArgs.wordTextColor,
+      '--hover_highlighter-word_text_color',
+      hoverHighlighterArgs.wordTextColor,
   );
 
   // This value is useful in two ways:

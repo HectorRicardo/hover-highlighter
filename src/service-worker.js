@@ -11,14 +11,16 @@ chrome.action.onClicked.addListener(async (tab) => {
     target: {tabId: tab.id},
     func: (args) => {
       window.hoverHighlighterArgs = args;
+      console.log('assigning', args);
     },
     args: [{
-      lineBackgroundColor: '#ADD8E660',
+      lineBackgroundColor: '#ADD8E6',
       lineTextColor: 'black',
-      wordBackgroundColor: '#FDE97D60',
+      wordBackgroundColor: '#FDE97D',
       wordTextColor: 'black',
     }],
   });
+  console.log('injected first script');
 
   // This gives the extension new on/off status.
   const [{result: isTurnedOn}] = await chrome.scripting.executeScript({
