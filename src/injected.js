@@ -226,6 +226,23 @@
   }
 
   /**
+   * A limit on the number of expansions to the `highlightLineRange` to check
+   * if including the previous or next character in the `highlightLineRange`
+   * causes it to overflow to a new line.
+   *
+   * We need to limit the number of expansion checks because all this logic runs
+   * in the `pointermove` event, and it shouldn't take long (otherwise, we get
+   * laggy UI experience).
+   */
+  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 105;
+
+  /**
+   * The number of expansions to the `highlightLineRange` so far. Should be
+   * reset to 0 in between triggers of the `pointermove` event.
+   */
+  let highlightLineRangeExpansions = 0;
+
+  /**
    * Sets `highlightLineRange` to the line at the caret position. The line may
    * span multiple nodes from different parents.
    *
@@ -264,6 +281,7 @@
       return;
     }
 
+    highlightLineRangeExpansions = 0;
     updateHighlightLineRangeEnd();
     updateHighlightLineRangeStart();
 
@@ -297,6 +315,10 @@
    * @return {boolean}
    */
   function expandHighlightLineRangeStartSafely(newNode, newOffset) {
+    if (++highlightLineRangeExpansions > MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS) {
+      return false;
+    }
+
     const prevNode = highlightLineRange.startContainer;
     const prevOffset = highlightLineRange.startOffset;
 
@@ -306,11 +328,6 @@
       // more than one line.
       highlightLineRange.setStart(prevNode, prevOffset);
       return false;
-    }
-    // If this new character is whitespace, rollback the highlighting to avoid
-    // including leading whitespace in the range.
-    if (newNode.textContent[newOffset].trim() === '') {
-      highlightLineRange.setStart(prevNode, prevOffset);
     }
     return true;
   }
@@ -331,6 +348,10 @@
    * @return {boolean}
    */
   function expandHighlightLineRangeEndSafely(newNode, newOffset) {
+    if (++highlightLineRangeExpansions > MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS) {
+      return false;
+    }
+
     const prevNode = highlightLineRange.endContainer;
     const prevOffset = highlightLineRange.endOffset;
 
@@ -340,11 +361,6 @@
       // more than one line.
       highlightLineRange.setEnd(prevNode, prevOffset);
       return false;
-    }
-    // If this new character is whitespace, rollback the highlighting to avoid
-    // including trailing whitespace in the range.
-    if (newOffset > 0 && newNode.textContent[newOffset - 1].trim() === '') {
-      highlightLineRange.setEnd(prevNode, prevOffset);
     }
     return true;
   }
@@ -366,8 +382,9 @@
       while (currentOffset > 0) {
         // Check if we can expand the start position to include the previous
         // character. If not, we return.
-        if (!expandHighlightLineRangeStartSafely(
-                currentNode, --currentOffset)) {
+        --currentOffset;
+        if (currentNode.textContent[currentOffset].trim() !== '' &&
+            !expandHighlightLineRangeStartSafely(currentNode, currentOffset)) {
           return;
         }
       }
@@ -410,11 +427,13 @@
           currentNode = previousNode;
           continue;
         }
-        if (expandHighlightLineRangeStartSafely(
+        if (lastTextNode.textContent[lastTextNode.textContent.length - 1]
+                    .trim() === '' ||
+            expandHighlightLineRangeStartSafely(
                 lastTextNode, lastTextNode.textContent.length - 1)) {
-          // Expanding the range to include the last character of the previous
-          // node is safe. Break out of this inner loop to begin executing this
-          // whole function again.
+          // We don't have evidence that including this position will cause the
+          // line to overflow. Break out of this inner loop to begin executing
+          // this whole function again.
           currentNode = lastTextNode;
           currentOffset = lastTextNode.textContent.length - 1;
           break;
@@ -443,9 +462,12 @@
       while (currentOffset < currentNode.textContent.length) {
         // Check if we can expand the end position to include the next
         // character. If not, we return.
-        if (!expandHighlightLineRangeEndSafely(currentNode, ++currentOffset)) {
+        if (currentNode.textContent[currentOffset].trim() !== '' &&
+            !expandHighlightLineRangeEndSafely(
+                currentNode, currentOffset + 1)) {
           return;
         }
+        ++currentOffset;
       }
 
       // We managed to expand the end of `highlightRange` to include the
@@ -486,10 +508,11 @@
           currentNode = nextNode;
           continue;
         }
-        if (expandHighlightLineRangeEndSafely(nextTextNode, 0)) {
-          // Expanding the range to include the next text node is safe. Break
-          // out of this inner loop to begin executing this whole function
-          // again.
+        if (nextTextNode.textContent[0].trim() === '' ||
+            expandHighlightLineRangeEndSafely(nextTextNode, 0)) {
+          // We don't have evidence that including this position will cause the
+          // line to overflow. Break out of this inner loop to begin executing
+          // this whole function again.
           currentNode = nextTextNode;
           currentOffset = 0;
           break;
@@ -566,6 +589,8 @@
       if (caretPosition === undefined) {
         caretPosition = document.caretPositionFromPoint(event.x, event.y);
       }
+
+      if (event.ctrlKey) debugger;
 
       // Find out the line under the caret/cursor and highlight it.
       setHighlightLineRange(caretPosition, event.y);
