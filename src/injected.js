@@ -30,7 +30,8 @@
   if (window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY] != null) {
     console.log('Turning off Hover Highlighter.');
 
-    const {pointerMoveHandler, pointerLeaveHandler} = window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY];
+    const {pointerMoveHandler, pointerLeaveHandler} =
+        window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY];
 
     document.body.removeEventListener('pointermove', pointerMoveHandler);
     document.body.removeEventListener('pointerleave', pointerLeaveHandler);
@@ -65,7 +66,7 @@
    * - exclamation mark !
    * - ellipsis …
    *
-   * @param {string} char
+   * @param {string} char A string of length 1.
    * @return {boolean}
    */
   function isDelimiter(char) {
@@ -74,6 +75,19 @@
 
   function isWordChar(char) {
     return !isDelimiter(char);
+  }
+
+  /**
+   * @param {string} ch A string of length 1.
+   * @return {boolean}
+   */
+  function isWhitespaceOrZeroWidth(ch) {
+    return /\s|\p{Cf}/u.test(ch);
+  }
+
+  function rectanglesAreEqual(rect1, rect2) {
+    return rect1.left === rect2.left && rect1.right === rect2.right &&
+        rect1.top === rect2.top && rect1.bottom === rect2.bottom;
   }
 
   function isInsideRect(rect, x, y) {
@@ -88,6 +102,8 @@
    * Returns whether the given point lies outside the highlighted word. If
    * there is no highlighted word, then returns true.
    *
+   * @param {number} x
+   * @param {number} y
    * @return {boolean}
    */
   function isPointOutsideHighlightedWord(x, y) {
@@ -194,8 +210,35 @@
     highlightWordRange.setEnd(endNode, endOffset);
   }
 
+  class CachedRange extends Range {
+    #boundingClientRect = null;
+
+    collapse() {
+      this.invalidateBoundingClientRectangle();
+      super.collapse();
+    }
+
+    getBoundingClientRect() {
+      return this.#boundingClientRect ??= super.getBoundingClientRect();
+    }
+
+    invalidateBoundingClientRectangle() {
+      this.#boundingClientRect = null;
+    }
+
+    setEnd(node, offset) {
+      this.invalidateBoundingClientRectangle();
+      super.setEnd(node, offset);
+    }
+
+    setStart(node, offset) {
+      this.invalidateBoundingClientRectangle();
+      super.setStart(node, offset);
+    }
+  }
+
   /** The range that contains the line currently highlighted. */
-  const highlightLineRange = document.createRange();
+  const highlightLineRange = new CachedRange();
 
   function isPointOutsideHighlightedLine(x, y) {
     return highlightLineRange.collapsed ||
@@ -238,7 +281,7 @@
    * in the `pointermove` event, and it shouldn't take long (otherwise, we get
    * laggy UI experience).
    */
-  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 105;
+  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 115;
 
   /**
    * The number of expansions to the `highlightLineRange` so far. Should be
@@ -276,45 +319,44 @@
       return;
     }
 
-    highlightLineRangeExpansions = 0;
-
     // In theory, a range spanning only character should lie in one line.
     // However, if the character is the one that comes after the hyphen in a
     // hyphenated word, the browser believes it spans 2 lines. So we defend
     // ourselves against that case.
-    if (highlightLineRangeSpansMultipleLines()) {
+    // TODO - check if this behavior is a bug or is intended.
+    if (highlightLineRange.getClientRects().length > 1) {
       highlightLineRange.collapse(false);
       return;
     }
 
-    let startPosition = {node: caretPosition.offsetNode, offset: startOffset};
-    let endPosition = {node: caretPosition.offsetNode, offset: startOffset + 1};
+    highlightLineRangeExpansions = 0;
+
+    let keepGoingStart = true;
+    let keepGoingEnd = true;
 
     do {
-      endPosition = updateHighlightLineRangeEnd(
-          endPosition.node, endPosition.offset, /* oneChar= */ true);
-      startPosition = updateHighlightLineRangeStart(
-          startPosition.node, startPosition.offset, /* oneChar= */ true);
-    } while (endPosition != null && startPosition != null);
+      keepGoingEnd = updateHighlightLineRangeEnd(/* oneChar= */ true);
+      keepGoingStart = updateHighlightLineRangeStart(/* oneChar= */ true);
+    } while (keepGoingStart && keepGoingEnd);
 
-    if (endPosition != null) {
-      updateHighlightLineRangeEnd(endPosition.node, endPosition.offset);
+    if (keepGoingStart) {
+      updateHighlightLineRangeStart(/* oneChar= */ false);
     }
 
-    if (startPosition != null) {
-      updateHighlightLineRangeStart(startPosition.node, startPosition.offset);
+    if (keepGoingEnd) {
+      updateHighlightLineRangeEnd(/* oneChar= */ false);
     }
 
     // This if-check means: if the caret is pointing to the leading or trailing
     // whitespace of the line, then this doesn't count as valid highlighting.
     if (highlightLineRange.startContainer === caretPosition.offsetNode &&
             highlightLineRange.startOffset === startOffset &&
-            highlightLineRange.startContainer.textContent[startOffset]
-                    .trim() === '' ||
+            isWhitespaceOrZeroWidth(
+                highlightLineRange.startContainer.textContent[startOffset]) ||
         highlightLineRange.endContainer === caretPosition.offsetNode &&
             highlightLineRange.endOffset === startOffset + 1 &&
-            highlightLineRange.endContainer.textContent[startOffset].trim() ===
-                '') {
+            isWhitespaceOrZeroWidth(
+                highlightLineRange.endContainer.textContent[startOffset])) {
       highlightLineRange.collapse(false);
     }
   }
@@ -324,20 +366,32 @@
    * then checks if the range spans more than one line. If it does, we rollback
    * the expansion and return false. Otherwise, we return true.
    *
+   * If `checkRectangleGrew` is true, then we also do an additional check: if
+   * the range's bounding rectangle isn't strictly bigger after the expansion,
+   * then we return false (and also rollback the expansion).
+   *
    * This function is symmetrical to `expandHighlightLineRangeEndSafely()`.
    *
    * @param {!Node} newNode Should be a text node.
    * @param {number} newOffset Should lie in the range [0, textContent.length).
+   * @param {boolean} checkRectangleGrew
    * @return {boolean}
    */
-  function expandHighlightLineRangeStartSafely(newNode, newOffset) {
+  function expandHighlightLineRangeStartSafely(
+      newNode, newOffset, checkRectangleGrew) {
     const prevNode = highlightLineRange.startContainer;
     const prevOffset = highlightLineRange.startOffset;
+    const prevRect =
+        checkRectangleGrew ? highlightLineRange.getBoundingClientRect() : null;
 
     highlightLineRange.setStart(newNode, newOffset);
-    if (highlightLineRangeSpansMultipleLines()) {
-      // Rollback the range to its previous position, since this one is spanning
-      // more than one line.
+
+    if (checkRectangleGrew &&
+            rectanglesAreEqual(
+                prevRect, highlightLineRange.getBoundingClientRect()) ||
+        highlightLineRangeSpansMultipleLines()) {
+      // Rollback the range to its previous position, since expanding to the new
+      // position either did nothing or caused the range to span multiple lines.
       highlightLineRange.setStart(prevNode, prevOffset);
       return false;
     }
@@ -349,20 +403,32 @@
    * checks if the range spans more than one line. If it does, we rollback the
    * expansion and return false. Otherwise, we return true.
    *
+   * If `checkRectangleGrew` is true, then we also do an additional check: if
+   * the range's bounding rectangle isn't strictly bigger after the expansion,
+   * then we return false (and also rollback the expansion).
+   *
    * This function is symmetrical to `expandHighlightLineRangeStartSafely()`.
    *
    * @param {!Node} newNode Should be a text node.
    * @param {number} newOffset Should lie in the range [0, textContent.length).
+   * @param {boolean} checkRectangleGrew
    * @return {boolean}
    */
-  function expandHighlightLineRangeEndSafely(newNode, newOffset) {
+  function expandHighlightLineRangeEndSafely(
+      newNode, newOffset, checkRectangleGrew) {
     const prevNode = highlightLineRange.endContainer;
     const prevOffset = highlightLineRange.endOffset;
+    const prevRect =
+        checkRectangleGrew ? highlightLineRange.getBoundingClientRect() : null;
 
     highlightLineRange.setEnd(newNode, newOffset);
-    if (highlightLineRangeSpansMultipleLines()) {
-      // Rollback the range to its previous position, since this one is spanning
-      // more than one line.
+
+    if (checkRectangleGrew &&
+            rectanglesAreEqual(
+                prevRect, highlightLineRange.getBoundingClientRect()) ||
+        highlightLineRangeSpansMultipleLines()) {
+      // Rollback the range to its previous position, since expanding to the new
+      // position either did nothing or caused the range to span multiple lines.
       highlightLineRange.setEnd(prevNode, prevOffset);
       return false;
     }
@@ -370,25 +436,39 @@
   }
 
   /**
-   * Expands `highlightLineRange`'s start position as much as possible without
-   * causing it to span more than one line.
+   * Expands `highlightLineRange`'s start position without causing it to span
+   * more than one line. If `oneChar` is true, then the range is only expanded
+   * at most one character. Otherwise, it is expanded as much as possible.
    *
-   * Precondition: `highlightLineRange` must span one line.
+   * If `oneChar` is true, then returns whether the range's start position was
+   * expanded one char. Otherwise, returns false.
+   *
+   * Precondition: `highlightLineRange` must be non-empty and span one line.
    *
    * This function is symmetrical to `updateHighlightLineRangeEnd()`.
+   *
+   * @param {boolean} oneChar
+   * @return {boolean}
    */
-  function updateHighlightLineRangeStart(currentNode, currentOffset, oneChar) {
+  function updateHighlightLineRangeStart(oneChar) {
+    let currentNode = highlightLineRange.startContainer;
+    let currentOffset = highlightLineRange.startOffset;
+
     while (true) {
       // Loop through the beginning of the current node.
       while (currentOffset > 0) {
+        if (isWhitespaceOrZeroWidth(currentNode.textContent[--currentOffset])) {
+          continue;
+        }
+
         // Check if we can expand the start position to include the previous
         // character. If not, we return.
-        --currentOffset;
-        if (currentNode.textContent[currentOffset].trim() !== '' &&
-            !expandHighlightLineRangeStartSafely(currentNode, currentOffset)) {
-          return null;
+        if (!expandHighlightLineRangeStartSafely(
+                currentNode, currentOffset, /* checkRectangleGrew = */ false)) {
+          return false;
         }
-        if (oneChar) return {node: currentNode, offset: currentOffset};
+
+        if (oneChar) return true;
       }
 
       // We managed to expand the start of `highlightRange` to include the
@@ -429,16 +509,21 @@
           currentNode = previousNode;
           continue;
         }
-        if (lastTextNode.textContent[lastTextNode.textContent.length - 1]
-                    .trim() === '' ||
+
+        const lastCharIdx = lastTextNode.textContent.length - 1;
+        const shouldSkip =
+            isWhitespaceOrZeroWidth(lastTextNode.textContent[lastCharIdx]);
+
+        if (shouldSkip ||
             expandHighlightLineRangeStartSafely(
-                lastTextNode, lastTextNode.textContent.length - 1)) {
+                lastTextNode, lastCharIdx, /* checkRectangleGrew= */ true)) {
           // We don't have evidence that including this position will cause the
           // line to overflow. Break out of this inner loop to begin executing
           // this whole function again.
+
           currentNode = lastTextNode;
           currentOffset = lastTextNode.textContent.length - 1;
-          if (oneChar) return {node: currentNode, offset: currentOffset};
+          if (oneChar && !shouldSkip) return true;
           break;
         }
         // Expanding to the last text node will inevitably cause the range to
@@ -452,24 +537,35 @@
    * Expands `highlightLineRange`'s end position as much as possible without
    * causing it to span more than one line.
    *
-   * Precondition: `highlightLineRange` must span one line.
+   * If `oneChar` is true, then returns whether the range's end position was
+   * expanded one char. Otherwise, returns false.
+   *
+   * Precondition: `highlightLineRange` must be non-empty and span one line.
    *
    * This function is symmetrical to `updateHighlightLineRangeStart()`.
    */
-  function updateHighlightLineRangeEnd(
-      currentNode, currentOffset, oneChar = false) {
+  function updateHighlightLineRangeEnd(oneChar) {
+    let currentNode = highlightLineRange.endContainer;
+    let currentOffset = highlightLineRange.endOffset;
+    let checkRectangleGrew = false;
+
     while (true) {
       // Loop through the end of the current node.
       while (currentOffset < currentNode.textContent.length) {
+        if (isWhitespaceOrZeroWidth(currentNode.textContent[currentOffset++])) {
+          continue;
+        }
+
         // Check if we can expand the end position to include the next
         // character. If not, we return.
-        if (currentNode.textContent[currentOffset].trim() !== '' &&
-            !expandHighlightLineRangeEndSafely(
-                currentNode, currentOffset + 1)) {
+        if (!expandHighlightLineRangeEndSafely(
+                currentNode, currentOffset, checkRectangleGrew)) {
           return null;
         }
-        ++currentOffset;
-        if (oneChar) return {node: currentNode, offset: currentOffset};
+
+        // We can expand the range, keep going.
+        if (oneChar) return true;
+        checkRectangleGrew = false;
       }
 
       // We managed to expand the end of `highlightRange` to include the
@@ -510,19 +606,13 @@
           currentNode = nextNode;
           continue;
         }
-        if (nextTextNode.textContent[0].trim() === '' ||
-            expandHighlightLineRangeEndSafely(nextTextNode, 0)) {
-          // We don't have evidence that including this position will cause the
-          // line to overflow. Break out of this inner loop to begin executing
-          // this whole function again.
-          currentNode = nextTextNode;
-          currentOffset = 0;
-          if (oneChar) return {node: currentNode, offset: currentOffset};
-          break;
-        }
-        // Expanding to the next text node will inevitably cause the range to
-        // span more than one line. Exiting now.
-        return null;
+        // We don't have evidence that including this position will cause the
+        // line to overflow. Break out of this inner loop to begin executing
+        // this whole function again.
+        currentNode = nextTextNode;
+        currentOffset = 0;
+        checkRectangleGrew = true;
+        break;
       }
     }
   }
@@ -579,6 +669,8 @@
         highlightWordRange.collapse(false);
       }
     }
+
+    highlightLineRange.invalidateBoundingClientRectangle();
 
     if (isPointOutsideHighlightedLine(event.x, event.y)) {
       // Note: how can the cursor be outside the highlighted word, but inside
