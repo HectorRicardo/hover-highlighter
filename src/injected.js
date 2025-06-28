@@ -30,12 +30,12 @@
   if (window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY] != null) {
     console.log('Turning off Hover Highlighter.');
 
-    document.body.removeEventListener(
-        'pointermove',
-        window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY].pointerMoveHandler);
-    document.body.removeEventListener(
-        'pointerleave',
-        window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY].pointerLeaveHandler);
+    const {pointerMoveHandler, pointerLeaveHandler} = window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY];
+
+    document.body.removeEventListener('pointermove', pointerMoveHandler);
+    document.body.removeEventListener('pointerleave', pointerLeaveHandler);
+
+    pointerLeaveHandler();
 
     delete window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY];
     CSS.highlights.delete(CSS_HIGHLIGHT_WORD_KEY);
@@ -297,14 +297,12 @@
           startPosition.node, startPosition.offset, /* oneChar= */ true);
     } while (endPosition != null && startPosition != null);
 
-    while (endPosition != null) {
-      endPosition =
-          updateHighlightLineRangeEnd(endPosition.node, endPosition.offset);
+    if (endPosition != null) {
+      updateHighlightLineRangeEnd(endPosition.node, endPosition.offset);
     }
 
-    while (startPosition != null) {
-      startPosition = updateHighlightLineRangeStart(
-          startPosition.node, startPosition.offset);
+    if (startPosition != null) {
+      updateHighlightLineRangeStart(startPosition.node, startPosition.offset);
     }
 
     // This if-check means: if the caret is pointing to the leading or trailing
