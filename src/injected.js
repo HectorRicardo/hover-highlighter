@@ -213,6 +213,10 @@
    * @return {boolean}
    */
   function highlightLineRangeSpansMultipleLines() {
+    if (++highlightLineRangeExpansions > MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS) {
+      return true;
+    }
+
     const rects = Array.from(highlightLineRange.getClientRects())
                       .filter(({width, height}) => width > 0 && height > 0);
     if (rects.length < 2) return false;
@@ -234,7 +238,7 @@
    * in the `pointermove` event, and it shouldn't take long (otherwise, we get
    * laggy UI experience).
    */
-  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 104;
+  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 105;
 
   /**
    * The number of expansions to the `highlightLineRange` so far. Should be
@@ -272,6 +276,8 @@
       return;
     }
 
+    highlightLineRangeExpansions = 0;
+
     // In theory, a range spanning only character should lie in one line.
     // However, if the character is the one that comes after the hyphen in a
     // hyphenated word, the browser believes it spans 2 lines. So we defend
@@ -280,8 +286,6 @@
       highlightLineRange.collapse(false);
       return;
     }
-
-    highlightLineRangeExpansions = 0;
 
     let startPosition = {node: caretPosition.offsetNode, offset: startOffset};
     let endPosition = {node: caretPosition.offsetNode, offset: startOffset + 1};
@@ -322,10 +326,6 @@
    * then checks if the range spans more than one line. If it does, we rollback
    * the expansion and return false. Otherwise, we return true.
    *
-   * We also rollback the expansion if the new character is whitespace, even if
-   * the range still spans one line (but we return true nonetheless). This is to
-   * avoid having leading whitespace in the range.
-   *
    * This function is symmetrical to `expandHighlightLineRangeEndSafely()`.
    *
    * @param {!Node} newNode Should be a text node.
@@ -333,10 +333,6 @@
    * @return {boolean}
    */
   function expandHighlightLineRangeStartSafely(newNode, newOffset) {
-    if (++highlightLineRangeExpansions > MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS) {
-      return false;
-    }
-
     const prevNode = highlightLineRange.startContainer;
     const prevOffset = highlightLineRange.startOffset;
 
@@ -355,10 +351,6 @@
    * checks if the range spans more than one line. If it does, we rollback the
    * expansion and return false. Otherwise, we return true.
    *
-   * We also rollback the expansion if the new character is whitespace, even if
-   * the range still spans one line (but we return true nonetheless). This is to
-   * avoid having trailing whitespace in the range.
-   *
    * This function is symmetrical to `expandHighlightLineRangeStartSafely()`.
    *
    * @param {!Node} newNode Should be a text node.
@@ -366,10 +358,6 @@
    * @return {boolean}
    */
   function expandHighlightLineRangeEndSafely(newNode, newOffset) {
-    if (++highlightLineRangeExpansions > MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS) {
-      return false;
-    }
-
     const prevNode = highlightLineRange.endContainer;
     const prevOffset = highlightLineRange.endOffset;
 
