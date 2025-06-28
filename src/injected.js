@@ -234,7 +234,7 @@
    * in the `pointermove` event, and it shouldn't take long (otherwise, we get
    * laggy UI experience).
    */
-  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 105;
+  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 104;
 
   /**
    * The number of expansions to the `highlightLineRange` so far. Should be
@@ -282,8 +282,26 @@
     }
 
     highlightLineRangeExpansions = 0;
-    updateHighlightLineRangeEnd();
-    updateHighlightLineRangeStart();
+
+    let startPosition = {node: caretPosition.offsetNode, offset: startOffset};
+    let endPosition = {node: caretPosition.offsetNode, offset: startOffset + 1};
+
+    do {
+      endPosition = updateHighlightLineRangeEnd(
+          endPosition.node, endPosition.offset, /* oneChar= */ true);
+      startPosition = updateHighlightLineRangeStart(
+          startPosition.node, startPosition.offset, /* oneChar= */ true);
+    } while (endPosition != null && startPosition != null);
+
+    while (endPosition != null) {
+      endPosition =
+          updateHighlightLineRangeEnd(endPosition.node, endPosition.offset);
+    }
+
+    while (startPosition != null) {
+      startPosition = updateHighlightLineRangeStart(
+          startPosition.node, startPosition.offset);
+    }
 
     // This if-check means: if the caret is pointing to the leading or trailing
     // whitespace of the line, then this doesn't count as valid highlighting.
@@ -373,10 +391,7 @@
    *
    * This function is symmetrical to `updateHighlightLineRangeEnd()`.
    */
-  function updateHighlightLineRangeStart() {
-    let currentNode = highlightLineRange.startContainer;
-    let currentOffset = highlightLineRange.startOffset;
-
+  function updateHighlightLineRangeStart(currentNode, currentOffset, oneChar) {
     while (true) {
       // Loop through the beginning of the current node.
       while (currentOffset > 0) {
@@ -385,8 +400,9 @@
         --currentOffset;
         if (currentNode.textContent[currentOffset].trim() !== '' &&
             !expandHighlightLineRangeStartSafely(currentNode, currentOffset)) {
-          return;
+          return null;
         }
+        if (oneChar) return {node: currentNode, offset: currentOffset};
       }
 
       // We managed to expand the start of `highlightRange` to include the
@@ -405,7 +421,7 @@
             if (parent === document.body) {
               // We arrived at the very beginning of the HTML page. Nothing else
               // to do.
-              return;
+              return null;
             }
             if (parent.previousSibling != null) {
               previousNode = parent.previousSibling;
@@ -436,11 +452,12 @@
           // this whole function again.
           currentNode = lastTextNode;
           currentOffset = lastTextNode.textContent.length - 1;
+          if (oneChar) return {node: currentNode, offset: currentOffset};
           break;
         }
         // Expanding to the last text node will inevitably cause the range to
         // span more than one line. Exiting now.
-        return;
+        return null;
       }
     }
   }
@@ -453,10 +470,8 @@
    *
    * This function is symmetrical to `updateHighlightLineRangeStart()`.
    */
-  function updateHighlightLineRangeEnd() {
-    let currentNode = highlightLineRange.endContainer;
-    let currentOffset = highlightLineRange.endOffset;
-
+  function updateHighlightLineRangeEnd(
+      currentNode, currentOffset, oneChar = false) {
     while (true) {
       // Loop through the end of the current node.
       while (currentOffset < currentNode.textContent.length) {
@@ -465,9 +480,10 @@
         if (currentNode.textContent[currentOffset].trim() !== '' &&
             !expandHighlightLineRangeEndSafely(
                 currentNode, currentOffset + 1)) {
-          return;
+          return null;
         }
         ++currentOffset;
+        if (oneChar) return {node: currentNode, offset: currentOffset};
       }
 
       // We managed to expand the end of `highlightRange` to include the
@@ -486,7 +502,7 @@
             if (parent === document.body) {
               // We arrived at the very beginning of the HTML page. Nothing else
               // to do.
-              return;
+              return null;
             }
             if (parent.nextSibling != null) {
               nextNode = parent.nextSibling;
@@ -515,11 +531,12 @@
           // this whole function again.
           currentNode = nextTextNode;
           currentOffset = 0;
+          if (oneChar) return {node: currentNode, offset: currentOffset};
           break;
         }
         // Expanding to the next text node will inevitably cause the range to
         // span more than one line. Exiting now.
-        return;
+        return null;
       }
     }
   }
@@ -537,7 +554,9 @@
   }
 
   function getNextTextNode(root) {
-    if (root.nodeType === Node.TEXT_NODE) return root;
+    if (root.nodeType === Node.TEXT_NODE) {
+      return root.textContent === '' ? null : root;
+    }
     for (const childNode of root.childNodes) {
       const nextTextNode = getNextTextNode(childNode);
       if (nextTextNode != null) return nextTextNode;
