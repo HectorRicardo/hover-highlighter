@@ -213,6 +213,23 @@
   class CachedRange extends Range {
     #boundingClientRect = null;
 
+    /**
+     * The number of expansions to the `highlightLineRange` so far. Should be
+     * reset to 0 in between triggers of the `pointermove` event.
+     */
+    #linesSpannedChecks = 0;
+
+    /**
+     * A limit on the number of expansions to the `highlightLineRange` to check
+     * if including the previous or next character in the `highlightLineRange`
+     * causes it to overflow to a new line.
+     *
+     * We need to limit the number of expansion checks because all this logic runs
+     * in the `pointermove` event, and it shouldn't take long (otherwise, we get
+     * laggy UI experience).
+     */
+    static MAX_LINES_SPANNED_CHECKS = 115;
+
     collapse() {
       this.invalidateBoundingClientRectangle();
       super.collapse();
@@ -226,6 +243,10 @@
       this.#boundingClientRect = null;
     }
 
+    resetLinesSpannedChecksCount() {
+      this.#linesSpannedChecks = 0;
+    }
+
     setEnd(node, offset) {
       this.invalidateBoundingClientRectangle();
       super.setEnd(node, offset);
@@ -234,6 +255,33 @@
     setStart(node, offset) {
       this.invalidateBoundingClientRectangle();
       super.setStart(node, offset);
+    }
+
+    /**
+     * Returns whether `highlightLineRange` spans multiple lines.
+     *
+     * We use a heuristic to identify whether the range spans multiple lines.
+     * Let "f" be some hand-tuned factor between (1, 2]. For a range to span a
+     * single line, its bounding rectangle's height needs to be strictly less
+     * than "f" times the height of the range's shortest constituent rectangle.
+     *
+     * @return {boolean}
+     */
+    spansMultipleLines() {
+      if (++this.#linesSpannedChecks > CachedRange.MAX_LINES_SPANNED_CHECKS) {
+        return true;
+      }
+
+      const rects = Array.from(this.getClientRects())
+                        .filter(({width, height}) => width > 0 && height > 0);
+      if (rects.length < 2) return false;
+
+      const minHeight = Math.min(...rects.map(({height}) => height));
+
+      // If f=2, then we highlight two lines in https://ground.news
+      const f = 1.5;
+
+      return f * minHeight <= this.getBoundingClientRect().height;
     }
 
     /**
@@ -261,7 +309,7 @@
 
       if (checkRectangleGrew &&
               rectanglesAreEqual(prevRect, this.getBoundingClientRect()) ||
-          highlightLineRangeSpansMultipleLines()) {
+          highlightLineRange.spansMultipleLines()) {
         // Rollback the range to its previous position, since expanding to the
         // new position either did nothing or caused the range to span multiple
         // lines.
@@ -296,7 +344,7 @@
 
       if (checkRectangleGrew &&
               rectanglesAreEqual(prevRect, this.getBoundingClientRect()) ||
-          highlightLineRangeSpansMultipleLines()) {
+          highlightLineRange.spansMultipleLines()) {
         // Rollback the range to its previous position, since expanding to the
         // new position either did nothing or caused the range to span multiple
         // lines.
@@ -314,50 +362,6 @@
     return highlightLineRange.collapsed ||
         !isInsideRect(highlightLineRange.getBoundingClientRect(), x, y);
   }
-
-  /**
-   * Returns whether `highlightLineRange` spans multiple lines.
-   *
-   * We use a heuristic to identify whether the range spans multiple lines. Let
-   * "f" be some hand-tuned factor between (1, 2]. For a range to span a single
-   * line, its bounding rectangle's height needs to be strictly less than "f"
-   * times the height of the range's shortest constituent rectangle.
-   *
-   * @return {boolean}
-   */
-  function highlightLineRangeSpansMultipleLines() {
-    if (++highlightLineRangeExpansions > MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS) {
-      return true;
-    }
-
-    const rects = Array.from(highlightLineRange.getClientRects())
-                      .filter(({width, height}) => width > 0 && height > 0);
-    if (rects.length < 2) return false;
-
-    const minHeight = Math.min(...rects.map(({height}) => height));
-
-    // If f=2, then we highlight two lines in https://ground.news
-    const f = 1.5;
-
-    return f * minHeight <= highlightLineRange.getBoundingClientRect().height;
-  }
-
-  /**
-   * A limit on the number of expansions to the `highlightLineRange` to check
-   * if including the previous or next character in the `highlightLineRange`
-   * causes it to overflow to a new line.
-   *
-   * We need to limit the number of expansion checks because all this logic runs
-   * in the `pointermove` event, and it shouldn't take long (otherwise, we get
-   * laggy UI experience).
-   */
-  const MAX_HIGHLIGHT_LINE_RANGE_EXPANSIONS = 115;
-
-  /**
-   * The number of expansions to the `highlightLineRange` so far. Should be
-   * reset to 0 in between triggers of the `pointermove` event.
-   */
-  let highlightLineRangeExpansions = 0;
 
   /**
    * Sets `highlightLineRange` to the line at the caret position. The line may
@@ -399,7 +403,7 @@
       return;
     }
 
-    highlightLineRangeExpansions = 0;
+    highlightLineRange.resetLinesSpannedChecksCount();
 
     let keepGoingStart = true;
     let keepGoingEnd = true;
