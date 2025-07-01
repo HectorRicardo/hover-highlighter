@@ -210,7 +210,7 @@
     highlightWordRange.setEnd(endNode, endOffset);
   }
 
-  class CachedRange extends Range {
+  class CachedLineRange extends Range {
     #boundingClientRect = null;
 
     /**
@@ -268,7 +268,7 @@
      * @return {boolean}
      */
     spansMultipleLines() {
-      if (++this.#linesSpannedChecks > CachedRange.MAX_LINES_SPANNED_CHECKS) {
+      if (++this.#linesSpannedChecks > CachedLineRange.MAX_LINES_SPANNED_CHECKS) {
         return true;
       }
 
@@ -296,7 +296,7 @@
      * This function is symmetrical to `expandHighlightLineRangeStartSafely()`.
      *
      * @param {!Node} newNode Should be a text node.
-     * @param {number} newOffset Should lie in [0, textContent.length).
+     * @param {number} newOffset Should lie in (0, textContent.length].
      * @param {boolean} checkRectangleGrew
      * @return {boolean}
      */
@@ -331,7 +331,7 @@
      * This function is symmetrical to `expandHighlightLineRangeEndSafely()`.
      *
      * @param {!Node} newNode Should be a text node.
-     * @param {number} newOffset Should lie in the range [0, textContent.length).
+     * @param {number} newOffset Should lie in [0, textContent.length).
      * @param {boolean} checkRectangleGrew
      * @return {boolean}
      */
@@ -356,7 +356,7 @@
   }
 
   /** The range that contains the line currently highlighted. */
-  const highlightLineRange = new CachedRange();
+  const highlightLineRange = new CachedLineRange();
 
   function isPointOutsideHighlightedLine(x, y) {
     return highlightLineRange.collapsed ||
@@ -487,7 +487,7 @@
             if (parent === document.body) {
               // We arrived at the very beginning of the HTML page. Nothing else
               // to do.
-              return null;
+              return false;
             }
             if (parent.previousSibling != null) {
               previousNode = parent.previousSibling;
@@ -528,7 +528,7 @@
         }
         // Expanding to the last text node will inevitably cause the range to
         // span more than one line. Exiting now.
-        return null;
+        return false;
       }
     }
   }
@@ -560,7 +560,7 @@
         // character. If not, we return.
         if (!highlightLineRange.tryToExpandEnd(
                 currentNode, currentOffset, checkRectangleGrew)) {
-          return null;
+          return false;
         }
 
         // We can expand the range, keep going.
@@ -584,7 +584,7 @@
             if (parent === document.body) {
               // We arrived at the very beginning of the HTML page. Nothing else
               // to do.
-              return null;
+              return false;
             }
             if (parent.nextSibling != null) {
               nextNode = parent.nextSibling;
