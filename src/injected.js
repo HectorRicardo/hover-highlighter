@@ -206,7 +206,18 @@
   }
 
   class CachedLineRange extends Range {
-    #boundingClientRect = null;
+    #singleCharRange = document.createRange();
+
+    #manualBoundingRectTop = 0;
+    #manualBoundingRectBottom = 0;
+    #minRectHeight = 0;
+
+    setInitialRect(rect) {
+      this.#minRectHeight = rect.bottom - rect.top;
+      this.#manualBoundingRectTop = rect.top;
+      this.#manualBoundingRectBottom = rect.bottom;
+      this.#linesSpannedChecks = 0;
+    }
 
     /**
      * The number of expansions to the `highlightLineRange` so far. Should be
@@ -223,60 +234,10 @@
      * in the `pointermove` event, and it shouldn't take long (otherwise, we get
      * laggy UI experience).
      */
-    static MAX_LINES_SPANNED_CHECKS = 110;
-
-    collapse() {
-      this.invalidateBoundingClientRectangle();
-      super.collapse();
-    }
-
-    getBoundingClientRect() {
-      return this.#boundingClientRect ??= super.getBoundingClientRect();
-    }
-
-    invalidateBoundingClientRectangle() {
-      this.#boundingClientRect = null;
-    }
+    static MAX_LINES_SPANNED_CHECKS = 105;
 
     resetLinesSpannedChecksCount() {
       this.#linesSpannedChecks = 0;
-    }
-
-    setEnd(node, offset) {
-      this.invalidateBoundingClientRectangle();
-      super.setEnd(node, offset);
-    }
-
-    setStart(node, offset) {
-      this.invalidateBoundingClientRectangle();
-      super.setStart(node, offset);
-    }
-
-    /**
-     * Returns whether `highlightLineRange` spans multiple lines.
-     *
-     * We use a heuristic to identify whether the range spans multiple lines.
-     * Let "f" be some hand-tuned factor between (1, 2]. For a range to span a
-     * single line, its bounding rectangle's height needs to be strictly less
-     * than "f" times the height of the range's shortest constituent rectangle.
-     *
-     * @return {boolean}
-     */
-    spansMultipleLines() {
-      if (++this.#linesSpannedChecks > CachedLineRange.MAX_LINES_SPANNED_CHECKS) {
-        return true;
-      }
-
-      const rects = Array.from(this.getClientRects())
-                        .filter(({width, height}) => width > 0 && height > 0);
-      if (rects.length < 2) return false;
-
-      const minHeight = Math.min(...rects.map(({height}) => height));
-
-      // If f=2, then we highlight two lines in https://ground.news
-      const f = 1.73;
-
-      return f * minHeight <= this.getBoundingClientRect().height;
     }
 
     /**
@@ -291,19 +252,29 @@
      * @return {boolean}
      */
     tryToExpandEnd(newNode, newOffset) {
-      const prevNode = this.endContainer;
-      const prevOffset = this.endOffset;
-
-      this.setEnd(newNode, newOffset);
-
-      if (highlightLineRange.spansMultipleLines()) {
-        // Rollback the range to its previous position, since expanding to the
-        // new position either did nothing or caused the range to span multiple
-        // lines.
-        this.setEnd(prevNode, prevOffset);
+      if (++this.#linesSpannedChecks > CachedLineRange.MAX_LINES_SPANNED_CHECKS) {
         return false;
       }
-      return true;
+
+      this.#singleCharRange.setStart(newNode, newOffset - 1);
+      this.#singleCharRange.setEnd(newNode, newOffset);
+
+      const singleCharRect = this.#singleCharRange.getBoundingClientRect();
+
+      const minHeight = Math.min(this.#minRectHeight, singleCharRect.height);
+
+      const newBoundingRectTop = Math.min(singleCharRect.top, this.#manualBoundingRectTop);
+      const newBoundingRectBottom = Math.max(singleCharRect.bottom, this.#manualBoundingRectBottom);
+      const newBoundingRectHeight = newBoundingRectBottom - newBoundingRectTop;
+
+      const isSameLine = 1.73 * minHeight > newBoundingRectHeight;
+      if (isSameLine) {
+        this.#manualBoundingRectTop = newBoundingRectTop;
+        this.#manualBoundingRectBottom = newBoundingRectBottom;
+        this.#minRectHeight = minHeight;
+        this.setEnd(newNode, newOffset);
+      }
+      return isSameLine;
     }
 
     /**
@@ -318,19 +289,27 @@
      * @return {boolean}
      */
     tryToExpandStart(newNode, newOffset) {
-      const prevNode = this.startContainer;
-      const prevOffset = this.startOffset;
-
-      this.setStart(newNode, newOffset);
-
-      if (highlightLineRange.spansMultipleLines()) {
-        // Rollback the range to its previous position, since expanding to the
-        // new position either did nothing or caused the range to span multiple
-        // lines.
-        this.setStart(prevNode, prevOffset);
+      if (++this.#linesSpannedChecks > CachedLineRange.MAX_LINES_SPANNED_CHECKS) {
         return false;
       }
-      return true;
+
+      this.#singleCharRange.setStart(newNode, newOffset);
+      this.#singleCharRange.setEnd(newNode, newOffset + 1);
+      const singleCharRect = this.#singleCharRange.getBoundingClientRect();
+      const minHeight = Math.min(this.#minRectHeight, singleCharRect.height);
+
+      const newBoundingRecTop = Math.min(singleCharRect.top, this.#manualBoundingRectTop);
+      const newBoundingRectBottom =  Math.max(singleCharRect.bottom, this.#manualBoundingRectBottom);
+      const newBoundingRectHeight = newBoundingRectBottom - newBoundingRecTop;
+
+      const isSameLine = 1.73 * minHeight > newBoundingRectHeight;
+      if (isSameLine) {
+        this.#manualBoundingRectTop = newBoundingRecTop;
+        this.#manualBoundingRectBottom = newBoundingRectBottom;
+        this.#minRectHeight = minHeight;
+        this.setStart(newNode, newOffset);
+      }
+      return isSameLine;
     }
   }
 
@@ -371,6 +350,8 @@
       highlightLineRange.collapse(false);
       return;
     }
+
+    highlightLineRange.setInitialRect(lineRect);
 
     // In theory, a range spanning only character should lie in one line.
     // However, if the character is the one that comes after the hyphen in a
@@ -656,8 +637,6 @@
         highlightWordRange.collapse(false);
       }
     }
-
-    highlightLineRange.invalidateBoundingClientRectangle();
 
     if (isPointOutsideHighlightedLine(event.x, event.y)) {
       // Note: how can the cursor be outside the highlighted word, but inside
