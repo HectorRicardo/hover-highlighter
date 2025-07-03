@@ -279,7 +279,7 @@
       const minHeight = Math.min(...rects.map(({height}) => height));
 
       // If f=2, then we highlight two lines in https://ground.news
-      const f = 1.5;
+      const f = 1.73;
 
       return f * minHeight <= this.getBoundingClientRect().height;
     }
