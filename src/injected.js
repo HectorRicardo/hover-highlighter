@@ -53,7 +53,7 @@
    *
    * - whitespace
    * - underscore _
-   * - hyphens - and –
+   * - hyphens -, –, —
    * - slash /
    * - open and close parentheses ()
    * - open and close square brackets []
@@ -70,7 +70,7 @@
    * @return {boolean}
    */
   function isDelimiter(char) {
-    return /[\s_\-–/\(\)\{\}\[\],\.:;?!…]/.test(char);
+    return /[\s_\-—–/\(\)\{\}\[\],\.:;?!…]/.test(char);
   }
 
   function isWordChar(char) {
