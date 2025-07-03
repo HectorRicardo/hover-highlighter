@@ -479,7 +479,7 @@
 
       while (true) {
         let previousNode = currentNode.previousSibling;
-        if (previousNode == null) {
+        if (previousNode == null || !occupiesSpace(previousNode)) {
           // Complex scenario: there is no previous consecutive sibling. We must
           // go to the previous uncle.
           let parent = currentNode.parentNode;
@@ -489,7 +489,7 @@
               // to do.
               return false;
             }
-            if (parent.previousSibling != null) {
+            if (parent.previousSibling != null && occupiesSpace(parent.previousSibling)) {
               previousNode = parent.previousSibling;
               break;
             }
@@ -531,6 +531,10 @@
         return false;
       }
     }
+  }
+
+  function occupiesSpace(node) {
+    return node.nodeType !== Node.ELEMENT_NODE || (node.offsetWidth > 0 && node.offsetHeight > 0);
   }
 
   /**
@@ -576,7 +580,7 @@
 
       while (true) {
         let nextNode = currentNode.nextSibling;
-        if (nextNode == null) {
+        if (nextNode == null || !occupiesSpace(nextNode)) {
           // Complex scenario: there is no next consecutive sibling. We must go
           // to the next uncle.
           let parent = currentNode.parentNode;
@@ -586,7 +590,7 @@
               // to do.
               return false;
             }
-            if (parent.nextSibling != null) {
+            if (parent.nextSibling != null && occupiesSpace(parent.nextSibling)) {
               nextNode = parent.nextSibling;
               break;
             }
@@ -623,6 +627,7 @@
     }
     for (let i = root.childNodes.length - 1; i >= 0; i--) {
       const childNode = root.childNodes[i];
+      if (!occupiesSpace(childNode)) continue;
       const lastTextNode = getLastNonEmptyTextNode(childNode);
       if (lastTextNode != null) return lastTextNode;
     }
@@ -634,6 +639,7 @@
       return root.textContent === '' ? null : root;
     }
     for (const childNode of root.childNodes) {
+      if (!occupiesSpace(childNode)) continue;
       const nextTextNode = getNextTextNode(childNode);
       if (nextTextNode != null) return nextTextNode;
     }
