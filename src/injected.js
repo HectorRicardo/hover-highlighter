@@ -223,7 +223,7 @@
      * in the `pointermove` event, and it shouldn't take long (otherwise, we get
      * laggy UI experience).
      */
-    static MAX_LINES_SPANNED_CHECKS = 115;
+    static MAX_LINES_SPANNED_CHECKS = 110;
 
     collapse() {
       this.invalidateBoundingClientRectangle();
@@ -457,7 +457,7 @@
 
       while (true) {
         let previousNode = currentNode.previousSibling;
-        if (previousNode == null || !occupiesSpace(previousNode)) {
+        if (previousNode == null) {
           // Complex scenario: there is no previous consecutive sibling. We must
           // go to the previous uncle.
           let parent = currentNode.parentNode;
@@ -467,7 +467,7 @@
               // to do.
               return false;
             }
-            if (parent.previousSibling != null && occupiesSpace(parent.previousSibling)) {
+            if (parent.previousSibling != null) {
               previousNode = parent.previousSibling;
               break;
             }
@@ -475,6 +475,10 @@
             // looking there.
             parent = parent.parentNode;
           }
+        }
+        if (!occupiesSpace(previousNode)) {
+          currentNode = previousNode;
+          continue;
         }
 
         // We found the previous node in the DOM tree. We must look for its last
@@ -554,7 +558,7 @@
 
       while (true) {
         let nextNode = currentNode.nextSibling;
-        if (nextNode == null || !occupiesSpace(nextNode)) {
+        if (nextNode == null) {
           // Complex scenario: there is no next consecutive sibling. We must go
           // to the next uncle.
           let parent = currentNode.parentNode;
@@ -564,7 +568,7 @@
               // to do.
               return false;
             }
-            if (parent.nextSibling != null && occupiesSpace(parent.nextSibling)) {
+            if (parent.nextSibling != null) {
               nextNode = parent.nextSibling;
               break;
             }
@@ -572,6 +576,10 @@
             // looking there.
             parent = parent.parentNode;
           }
+        }
+        if (!occupiesSpace(nextNode)) {
+          currentNode = nextNode;
+          continue;
         }
 
         // We found the next node in the DOM tree. We must look for its first
