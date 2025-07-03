@@ -85,11 +85,6 @@
     return /\s|\p{Cf}/u.test(ch);
   }
 
-  function rectanglesAreEqual(rect1, rect2) {
-    return rect1.left === rect2.left && rect1.right === rect2.right &&
-        rect1.top === rect2.top && rect1.bottom === rect2.bottom;
-  }
-
   function isInsideRect(rect, x, y) {
     return rect.left <= x && x <= rect.right && rect.top <= y &&
         y <= rect.bottom && rect.width > 0 && rect.height > 0;
@@ -289,27 +284,19 @@
      * then checks if the range spans more than one line. If it does, we
      * rollback the expansion and return false. Otherwise, we return true.
      *
-     * If `checkRectangleGrew` is true, then we also do an additional check: if
-     * the range's bounding rectangle isn't strictly bigger after the expansion,
-     * then we return false (and also rollback the expansion).
-     *
      * This function is symmetrical to `expandHighlightLineRangeStartSafely()`.
      *
      * @param {!Node} newNode Should be a text node.
      * @param {number} newOffset Should lie in (0, textContent.length].
-     * @param {boolean} checkRectangleGrew
      * @return {boolean}
      */
-    tryToExpandEnd(newNode, newOffset, checkRectangleGrew) {
+    tryToExpandEnd(newNode, newOffset) {
       const prevNode = this.endContainer;
       const prevOffset = this.endOffset;
-      const prevRect = checkRectangleGrew ? this.getBoundingClientRect() : null;
 
       this.setEnd(newNode, newOffset);
 
-      if (checkRectangleGrew &&
-              rectanglesAreEqual(prevRect, this.getBoundingClientRect()) ||
-          highlightLineRange.spansMultipleLines()) {
+      if (highlightLineRange.spansMultipleLines()) {
         // Rollback the range to its previous position, since expanding to the
         // new position either did nothing or caused the range to span multiple
         // lines.
@@ -324,27 +311,19 @@
      * then checks if the range spans more than one line. If it does, we rollback
      * the expansion and return false. Otherwise, we return true.
      *
-     * If `checkRectangleGrew` is true, then we also do an additional check: if
-     * the range's bounding rectangle isn't strictly bigger after the expansion,
-     * then we return false (and also rollback the expansion).
-     *
      * This function is symmetrical to `expandHighlightLineRangeEndSafely()`.
      *
      * @param {!Node} newNode Should be a text node.
      * @param {number} newOffset Should lie in [0, textContent.length).
-     * @param {boolean} checkRectangleGrew
      * @return {boolean}
      */
-    tryToExpandStart(newNode, newOffset, checkRectangleGrew) {
+    tryToExpandStart(newNode, newOffset) {
       const prevNode = this.startContainer;
       const prevOffset = this.startOffset;
-      const prevRect = checkRectangleGrew ? this.getBoundingClientRect() : null;
 
       this.setStart(newNode, newOffset);
 
-      if (checkRectangleGrew &&
-              rectanglesAreEqual(prevRect, this.getBoundingClientRect()) ||
-          highlightLineRange.spansMultipleLines()) {
+      if (highlightLineRange.spansMultipleLines()) {
         // Rollback the range to its previous position, since expanding to the
         // new position either did nothing or caused the range to span multiple
         // lines.
@@ -463,8 +442,7 @@
 
         // Check if we can expand the start position to include the previous
         // character. If not, we return.
-        if (!highlightLineRange.tryToExpandStart(
-                currentNode, currentOffset, /* checkRectangleGrew = */ false)) {
+        if (!highlightLineRange.tryToExpandStart(currentNode, currentOffset)) {
           return false;
         }
 
@@ -515,8 +493,7 @@
             isWhitespaceOrZeroWidth(lastTextNode.textContent[lastCharIdx]);
 
         if (shouldSkip ||
-            highlightLineRange.tryToExpandStart(
-                lastTextNode, lastCharIdx, /* checkRectangleGrew= */ true)) {
+            highlightLineRange.tryToExpandStart(lastTextNode, lastCharIdx)) {
           // We don't have evidence that including this position will cause the
           // line to overflow. Break out of this inner loop to begin executing
           // this whole function again.
@@ -551,7 +528,6 @@
   function updateHighlightLineRangeEnd(oneChar) {
     let currentNode = highlightLineRange.endContainer;
     let currentOffset = highlightLineRange.endOffset;
-    let checkRectangleGrew = false;
 
     while (true) {
       // Loop through the end of the current node.
@@ -562,14 +538,12 @@
 
         // Check if we can expand the end position to include the next
         // character. If not, we return.
-        if (!highlightLineRange.tryToExpandEnd(
-                currentNode, currentOffset, checkRectangleGrew)) {
+        if (!highlightLineRange.tryToExpandEnd(currentNode, currentOffset)) {
           return false;
         }
 
         // We can expand the range, keep going.
         if (oneChar) return true;
-        checkRectangleGrew = false;
       }
 
       // We managed to expand the end of `highlightRange` to include the
@@ -615,7 +589,6 @@
         // this whole function again.
         currentNode = nextTextNode;
         currentOffset = 0;
-        checkRectangleGrew = true;
         break;
       }
     }
