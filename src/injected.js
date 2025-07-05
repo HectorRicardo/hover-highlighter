@@ -236,10 +236,6 @@
      */
     static MAX_LINES_SPANNED_CHECKS = 105;
 
-    resetLinesSpannedChecksCount() {
-      this.#linesSpannedChecks = 0;
-    }
-
     /**
      * Expands `highlightLineRange` to the given new end node and offset, and
      * then checks if the range spans more than one line. If it does, we
@@ -260,14 +256,32 @@
       this.#singleCharRange.setEnd(newNode, newOffset);
 
       const singleCharRect = this.#singleCharRange.getBoundingClientRect();
-
       const minHeight = Math.min(this.#minRectHeight, singleCharRect.height);
 
-      const newBoundingRectTop = Math.min(singleCharRect.top, this.#manualBoundingRectTop);
-      const newBoundingRectBottom = Math.max(singleCharRect.bottom, this.#manualBoundingRectBottom);
-      const newBoundingRectHeight = newBoundingRectBottom - newBoundingRectTop;
+      let newBoundingRectTop;
+      let interceptRectTop;
+      if (singleCharRect.top < this.#manualBoundingRectTop) {
+        newBoundingRectTop = singleCharRect.top;
+        interceptRectTop = this.#manualBoundingRectTop;
+      } else {
+        newBoundingRectTop = this.#manualBoundingRectTop;
+        interceptRectTop = singleCharRect.top;
+      }
 
-      const isSameLine = 1.73 * minHeight > newBoundingRectHeight;
+      let newBoundingRectBottom;
+      let interceptRectBottom;
+      if (singleCharRect.bottom > this.#manualBoundingRectBottom) {
+        newBoundingRectBottom = singleCharRect.bottom;
+        interceptRectBottom = this.#manualBoundingRectBottom;
+      } else {
+        newBoundingRectBottom = this.#manualBoundingRectBottom;
+        interceptRectBottom = singleCharRect.bottom;
+      }
+
+      const newBoundingRectHeight = newBoundingRectBottom - newBoundingRectTop;
+      const interceptRectHeight = interceptRectBottom - interceptRectTop;
+
+      const isSameLine = 1.75 * minHeight > newBoundingRectHeight && 1.75 * interceptRectHeight > newBoundingRectHeight;
       if (isSameLine) {
         this.#manualBoundingRectTop = newBoundingRectTop;
         this.#manualBoundingRectBottom = newBoundingRectBottom;
@@ -298,13 +312,32 @@
       const singleCharRect = this.#singleCharRange.getBoundingClientRect();
       const minHeight = Math.min(this.#minRectHeight, singleCharRect.height);
 
-      const newBoundingRecTop = Math.min(singleCharRect.top, this.#manualBoundingRectTop);
-      const newBoundingRectBottom =  Math.max(singleCharRect.bottom, this.#manualBoundingRectBottom);
-      const newBoundingRectHeight = newBoundingRectBottom - newBoundingRecTop;
+      let newBoundingRectTop;
+      let interceptRectTop;
+      if (singleCharRect.top < this.#manualBoundingRectTop) {
+        newBoundingRectTop = singleCharRect.top;
+        interceptRectTop = this.#manualBoundingRectTop;
+      } else {
+        newBoundingRectTop = this.#manualBoundingRectTop;
+        interceptRectTop = singleCharRect.top;
+      }
 
-      const isSameLine = 1.73 * minHeight > newBoundingRectHeight;
+      let newBoundingRectBottom;
+      let interceptRectBottom;
+      if (singleCharRect.bottom > this.#manualBoundingRectBottom) {
+        newBoundingRectBottom = singleCharRect.bottom;
+        interceptRectBottom = this.#manualBoundingRectBottom;
+      } else {
+        newBoundingRectBottom = this.#manualBoundingRectBottom;
+        interceptRectBottom = singleCharRect.bottom;
+      }
+
+      const newBoundingRectHeight = newBoundingRectBottom - newBoundingRectTop;
+      const interceptRectHeight = interceptRectBottom - interceptRectTop;
+
+      const isSameLine = 1.75 * minHeight > newBoundingRectHeight && 1.75 * interceptRectHeight > newBoundingRectHeight;
       if (isSameLine) {
-        this.#manualBoundingRectTop = newBoundingRecTop;
+        this.#manualBoundingRectTop = newBoundingRectTop;
         this.#manualBoundingRectBottom = newBoundingRectBottom;
         this.#minRectHeight = minHeight;
         this.setStart(newNode, newOffset);
@@ -362,8 +395,6 @@
       highlightLineRange.collapse(false);
       return;
     }
-
-    highlightLineRange.resetLinesSpannedChecksCount();
 
     let keepGoingStart = true;
     let keepGoingEnd = true;
