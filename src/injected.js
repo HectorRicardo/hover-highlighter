@@ -33,8 +33,8 @@
     const {pointerMoveHandler, pointerLeaveHandler} =
         window[HOVER_HIGHLIGHTER_INFO_WINDOW_KEY];
 
-    document.body.removeEventListener('pointermove', pointerMoveHandler);
-    document.body.removeEventListener('pointerleave', pointerLeaveHandler);
+    document.removeEventListener('pointermove', pointerMoveHandler);
+    document.removeEventListener('pointerleave', pointerLeaveHandler);
 
     pointerLeaveHandler();
 
@@ -460,7 +460,7 @@
         if (previousNode == null) {
           // Complex scenario: there is no previous consecutive sibling. We must
           // go to the previous uncle.
-          let parent = currentNode.parentNode;
+          let parent = currentNode.parentElement;
           while (true) {
             if (parent === document.body) {
               // We arrived at the very beginning of the HTML page. Nothing else
@@ -473,7 +473,7 @@
             }
             // We don't have a previous uncle. Move to the grandparent and keep
             // looking there.
-            parent = parent.parentNode;
+            parent = parent.parentElement;
           }
         }
         if (!occupiesSpace(previousNode)) {
@@ -561,7 +561,7 @@
         if (nextNode == null) {
           // Complex scenario: there is no next consecutive sibling. We must go
           // to the next uncle.
-          let parent = currentNode.parentNode;
+          let parent = currentNode.parentElement;
           while (true) {
             if (parent === document.body) {
               // We arrived at the very beginning of the HTML page. Nothing else
@@ -574,7 +574,7 @@
             }
             // We don't have a next uncle. Move to the grandparent and keep
             // looking there.
-            parent = parent.parentNode;
+            parent = parent.parentElement;
           }
         }
         if (!occupiesSpace(nextNode)) {
@@ -693,6 +693,14 @@
     highlightLineRange.collapse(false);
   };
 
+  function updateProperty(propertyName, propertyValue) {
+    if (propertyValue == null) {
+      document.documentElement.style.removeProperty(propertyName);
+    } else {
+      document.documentElement.style.setProperty(propertyName, propertyValue);
+    }
+  }
+
   // Entry points and side effects below.
 
   // Register the word and line ranges in the CSS Highlights API. First the
@@ -702,28 +710,16 @@
       .set(CSS_HIGHLIGHT_LINE_KEY, new Highlight().add(highlightLineRange))
       .set(CSS_HIGHLIGHT_WORD_KEY, new Highlight().add(highlightWordRange));
 
-  document.body.addEventListener('pointermove', pointerMoveHandler);
-  document.body.addEventListener('pointerleave', pointerLeaveHandler);
+  document.addEventListener('pointermove', pointerMoveHandler);
+  document.addEventListener('pointerleave', pointerLeaveHandler);
 
   // Set all the colors according to the arguments.
   const {hoverHighlighterArgs} = window;
 
-  document.documentElement.style.setProperty(
-      '--hover_highlighter-line_background_color',
-      hoverHighlighterArgs.lineBackgroundColor,
-  );
-  document.documentElement.style.setProperty(
-      '--hover_highlighter-line_text_color',
-      hoverHighlighterArgs.lineTextColor,
-  );
-  document.documentElement.style.setProperty(
-      '--hover_highlighter-word_background_color',
-      hoverHighlighterArgs.wordBackgroundColor,
-  );
-  document.documentElement.style.setProperty(
-      '--hover_highlighter-word_text_color',
-      hoverHighlighterArgs.wordTextColor,
-  );
+  updateProperty('--hover_highlighter-line_background_color', hoverHighlighterArgs.lineBackgroundColor);
+  updateProperty('--hover_highlighter-line_text_color', hoverHighlighterArgs.lineTextColor);
+  updateProperty('--hover_highlighter-word_background_color', hoverHighlighterArgs.wordBackgroundColor);
+  updateProperty('--hover_highlighter-word_text_color', hoverHighlighterArgs.wordTextColor);
 
   // This value is useful in two ways:
   // 1. The presence/absence of this value is used as a state to know whether

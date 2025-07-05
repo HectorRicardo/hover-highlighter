@@ -14,9 +14,9 @@ chrome.action.onClicked.addListener(async (tab) => {
       console.log('assigning', args);
     },
     args: [{
-      lineBackgroundColor: '#ADD8E6',
+      lineBackgroundColor: 'rgba(173, 216, 230, 1)',
       lineTextColor: 'black',
-      wordBackgroundColor: '#FDE97D',
+      wordBackgroundColor: 'rgba(253, 233, 125, 1)',
       wordTextColor: 'black',
     }],
   });
