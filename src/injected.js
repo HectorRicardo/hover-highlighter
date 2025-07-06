@@ -85,9 +85,13 @@
     return /\s|\p{Cf}/u.test(ch);
   }
 
+  function rectOccupiesSpace(rect) {
+    return rect.width > 0 && rect.height > 0;
+  }
+
   function isInsideRect(rect, x, y) {
     return rect.left <= x && x <= rect.right && rect.top <= y &&
-        y <= rect.bottom && rect.width > 0 && rect.height > 0;
+        y <= rect.bottom && rectOccupiesSpace(rect);
   }
 
   /** The range that contains the word currently highlighted. */
@@ -354,6 +358,21 @@
         !isInsideRect(highlightLineRange.getBoundingClientRect(), x, y);
   }
 
+  function hasMoreThanOne(rectangles) {
+    if (rectangles.length <= 1) return false;
+
+    for (let i = 1; i < rectangles.length; i++) {
+      const rect1 = rectangles[i - 1];
+      const rect2 = rectangles[i];
+      if (rectOccupiesSpace(rect1) && rectOccupiesSpace(rect2) && (
+          rect1.x !== rect2.x || rect1.y !== rect2.y ||
+          rect1.width !== rect2.width || rect1.height !== rect2.height)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   /**
    * Sets `highlightLineRange` to the line at the caret position. The line may
    * span multiple nodes from different parents.
@@ -391,7 +410,7 @@
     // hyphenated word, the browser believes it spans 2 lines. So we defend
     // ourselves against that case.
     // TODO - check if this behavior is a bug or is intended.
-    if (highlightLineRange.getClientRects().length > 1) {
+    if (hasMoreThanOne(highlightLineRange.getClientRects())) {
       highlightLineRange.collapse(false);
       return;
     }
